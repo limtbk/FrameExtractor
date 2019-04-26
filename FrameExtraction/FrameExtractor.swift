@@ -12,8 +12,8 @@ protocol FrameExtractorDelegate: class {
 
 class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
-    private var position = AVCaptureDevicePosition.back
-    private let quality = AVCaptureSessionPresetMedium
+    private var position = AVCaptureDevice.Position.back
+    private let quality = AVCaptureSession.Preset.medium
     
     private var permissionGranted = false
     private let sessionQueue = DispatchQueue(label: "session queue")
@@ -34,9 +34,9 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     public func flipCamera() {
         sessionQueue.async { [unowned self] in
             self.captureSession.beginConfiguration()
-            guard let currentCaptureInput = self.captureSession.inputs.first as? AVCaptureInput else { return }
+            guard let currentCaptureInput = self.captureSession.inputs.first else { return }
             self.captureSession.removeInput(currentCaptureInput)
-            guard let currentCaptureOutput = self.captureSession.outputs.first as? AVCaptureOutput else { return }
+            guard let currentCaptureOutput = self.captureSession.outputs.first else { return }
             self.captureSession.removeOutput(currentCaptureOutput)
             self.position = self.position == .front ? .back : .front
             self.configureSession()
@@ -46,7 +46,7 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     // MARK: AVSession configuration
     private func checkPermission() {
-        switch AVCaptureDevice.authorizationStatus(forMediaType: AVMediaTypeVideo) {
+        switch AVCaptureDevice.authorizationStatus(for: AVMediaType.video) {
         case .authorized:
             permissionGranted = true
         case .notDetermined:
@@ -58,7 +58,7 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     private func requestPermission() {
         sessionQueue.suspend()
-        AVCaptureDevice.requestAccess(forMediaType: AVMediaTypeVideo) { [unowned self] granted in
+        AVCaptureDevice.requestAccess(for: AVMediaType.video) { [unowned self] granted in
             self.permissionGranted = granted
             self.sessionQueue.resume()
         }
@@ -75,7 +75,7 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "sample buffer"))
         guard captureSession.canAddOutput(videoOutput) else { return }
         captureSession.addOutput(videoOutput)
-        guard let connection = videoOutput.connection(withMediaType: AVFoundation.AVMediaTypeVideo) else { return }
+        guard let connection = videoOutput.connection(with: AVMediaType.video) else { return }
         guard connection.isVideoOrientationSupported else { return }
         guard connection.isVideoMirroringSupported else { return }
         connection.videoOrientation = .portrait
@@ -84,9 +84,9 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     private func selectCaptureDevice() -> AVCaptureDevice? {
         return AVCaptureDevice.devices().filter {
-            ($0 as AnyObject).hasMediaType(AVMediaTypeVideo) &&
+            ($0 as AnyObject).hasMediaType(AVMediaType.video) &&
             ($0 as AnyObject).position == position
-        }.first as? AVCaptureDevice
+            }.first
     }
     
     // MARK: Sample buffer to UIImage conversion
@@ -98,7 +98,7 @@ class FrameExtractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     
     // MARK: AVCaptureVideoDataOutputSampleBufferDelegate
-    func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputSampleBuffer sampleBuffer: CMSampleBuffer!, from connection: AVCaptureConnection!) {
+    func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let uiImage = imageFromSampleBuffer(sampleBuffer: sampleBuffer) else { return }
         DispatchQueue.main.async { [unowned self] in
             self.delegate?.captured(image: uiImage)
